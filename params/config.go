@@ -313,8 +313,9 @@ type ChainConfig struct {
 	CancunTime   *uint64 `json:"cancunTime,omitempty"`   // Cancun switch time (nil = no fork, 0 = already on cancun)
 	PragueTime   *uint64 `json:"pragueTime,omitempty"`   // Prague switch time (nil = no fork, 0 = already on prague)
 
-	BedrockBlock *big.Int `json:"bedrockBlock,omitempty"` // Bedrock switch block (nil = no fork, 0 = already on optimism bedrock)
-	RegolithTime *uint64  `json:"regolithTime,omitempty"` // Regolith switch time (nil = no fork, 0 = already on optimism regolith)
+	BedrockBlock     *big.Int `json:"bedrockBlock,omitempty"`     // Bedrock switch block (nil = no fork, 0 = already on optimism bedrock)
+	RegolithTime     *uint64  `json:"regolithTime,omitempty"`     // Regolith switch time (nil = no fork, 0 = already on optimism regolith)
+	PostRegolithTime *uint64  `json:"postregolithTime,omitempty"` // PostRegolith switch time (nil = no fork, 0 = already on optimism post regolith)
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.
@@ -561,6 +562,10 @@ func (c *ChainConfig) IsRegolith(time uint64) bool {
 	return isTimestampForked(c.RegolithTime, time)
 }
 
+func (c *ChainConfig) IsPostRegolith(time uint64) bool {
+	return isTimestampForked(c.PostRegolithTime, time)
+}
+
 // IsOptimism returns whether the node is an optimism node or not.
 func (c *ChainConfig) IsOptimism() bool {
 	return c.Optimism != nil
@@ -573,6 +578,9 @@ func (c *ChainConfig) IsOptimismBedrock(num *big.Int) bool {
 
 func (c *ChainConfig) IsOptimismRegolith(time uint64) bool {
 	return c.IsOptimism() && c.IsRegolith(time)
+}
+func (c *ChainConfig) IsOptimismPostRegolith(time uint64) bool {
+	return c.IsOptimism() && c.IsPostRegolith(time)
 }
 
 // IsOptimismPreBedrock returns true iff this is an optimism node & bedrock is not yet active
@@ -889,6 +897,7 @@ type Rules struct {
 	IsBerlin, IsLondon                                      bool
 	IsMerge, IsShanghai, IsCancun, IsPrague                 bool
 	IsOptimismBedrock, IsOptimismRegolith                   bool
+	IsOptimismPostRegolith                                  bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -914,7 +923,8 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsCancun:         c.IsCancun(num, timestamp),
 		IsPrague:         c.IsPrague(num, timestamp),
 		// Optimism
-		IsOptimismBedrock:  c.IsOptimismBedrock(num),
-		IsOptimismRegolith: c.IsOptimismRegolith(timestamp),
+		IsOptimismBedrock:      c.IsOptimismBedrock(num),
+		IsOptimismRegolith:     c.IsOptimismRegolith(timestamp),
+		IsOptimismPostRegolith: c.IsOptimismPostRegolith(timestamp),
 	}
 }
