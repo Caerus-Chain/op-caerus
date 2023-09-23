@@ -65,6 +65,9 @@ type Backend interface {
 	BlockByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Block, error)
 	StateAndHeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*state.StateDB, *types.Header, error)
 	StateAndHeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*state.StateDB, *types.Header, error)
+
+	StateAt(ctx context.Context, root common.Hash) (*state.StateDB, error)
+
 	PendingBlockAndReceipts() (*types.Block, types.Receipts)
 	GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error)
 	GetTd(ctx context.Context, hash common.Hash) *big.Int

@@ -51,6 +51,7 @@ func LoadOPStackChainConfig(chainID uint64) (*ChainConfig, error) {
 		LondonBlock:                   common.Big0,
 		ArrowGlacierBlock:             common.Big0,
 		GrayGlacierBlock:              common.Big0,
+		CaerusBlock:                   common.Big0,
 		MergeNetsplitBlock:            common.Big0,
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
@@ -90,6 +91,7 @@ func LoadOPStackChainConfig(chainID uint64) (*ChainConfig, error) {
 		out.BedrockBlock = big.NewInt(105235063)
 	case BaseGoerliChainID:
 		out.RegolithTime = &BaseGoerliRegolithTime
+		// TODO @lukepark327
 	}
 
 	return out, nil

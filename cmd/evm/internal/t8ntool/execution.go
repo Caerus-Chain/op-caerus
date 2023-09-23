@@ -123,6 +123,9 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 		}
 		return h
 	}
+	getStateAt := func(num uint64) *state.StateDB {
+		return &state.StateDB{} // TODO
+	}
 	var (
 		statedb     = MakePreState(rawdb.NewMemoryDatabase(), pre.Pre)
 		signer      = types.MakeSigner(chainConfig, new(big.Int).SetUint64(pre.Env.Number), pre.Env.Timestamp)
@@ -144,6 +147,7 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 		Difficulty:  pre.Env.Difficulty,
 		GasLimit:    pre.Env.GasLimit,
 		GetHash:     getHash,
+		GetStateAt:  getStateAt,
 	}
 	// If currentBaseFee is defined, add it to the vmContext.
 	if pre.Env.BaseFee != nil {
@@ -305,6 +309,13 @@ func MakePreState(db ethdb.Database, accounts core.GenesisAlloc) *state.StateDB 
 	// Commit and re-open to start with a clean state.
 	root, _ := statedb.Commit(false)
 	statedb, _ = state.New(root, sdb, nil)
+	return statedb
+}
+
+func StateAt(db ethdb.Database, root common.Hash) *state.StateDB {
+	sdb := state.NewDatabaseWithConfig(db, &trie.Config{Preimages: true})
+	statedb, _ := state.New(root, sdb, nil)
+
 	return statedb
 }
 

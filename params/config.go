@@ -68,6 +68,7 @@ var (
 		LondonBlock:                   big.NewInt(12_965_000),
 		ArrowGlacierBlock:             big.NewInt(13_773_000),
 		GrayGlacierBlock:              big.NewInt(15_050_000),
+		CaerusBlock:                   big.NewInt(0),
 		TerminalTotalDifficulty:       MainnetTerminalTotalDifficulty, // 58_750_000_000_000_000_000_000
 		TerminalTotalDifficultyPassed: true,
 		ShanghaiTime:                  newUint64(1681338455),
@@ -112,6 +113,7 @@ var (
 		BerlinBlock:         big.NewInt(8_290_928),
 		LondonBlock:         big.NewInt(8_897_988),
 		ArrowGlacierBlock:   nil,
+		CaerusBlock:         big.NewInt(0),
 		Clique: &CliqueConfig{
 			Period: 15,
 			Epoch:  30000,
@@ -159,6 +161,7 @@ var (
 		MuirGlacierBlock:              big.NewInt(0),
 		BerlinBlock:                   big.NewInt(0),
 		LondonBlock:                   big.NewInt(0),
+		CaerusBlock:                   big.NewInt(0),
 		ArrowGlacierBlock:             big.NewInt(0),
 		GrayGlacierBlock:              big.NewInt(0),
 		MergeNetsplitBlock:            nil,
@@ -188,6 +191,7 @@ var (
 		MuirGlacierBlock:              big.NewInt(0),
 		BerlinBlock:                   big.NewInt(0),
 		LondonBlock:                   big.NewInt(0),
+		CaerusBlock:                   big.NewInt(0),
 		ArrowGlacierBlock:             nil,
 		GrayGlacierBlock:              nil,
 		MergeNetsplitBlock:            nil,
@@ -217,6 +221,7 @@ var (
 		MuirGlacierBlock:              big.NewInt(0),
 		BerlinBlock:                   big.NewInt(0),
 		LondonBlock:                   big.NewInt(0),
+		CaerusBlock:                   big.NewInt(0),
 		ArrowGlacierBlock:             big.NewInt(0),
 		GrayGlacierBlock:              big.NewInt(0),
 		MergeNetsplitBlock:            nil,
@@ -246,6 +251,7 @@ var (
 		MuirGlacierBlock:              nil,
 		BerlinBlock:                   nil,
 		LondonBlock:                   nil,
+		CaerusBlock:                   nil,
 		ArrowGlacierBlock:             nil,
 		GrayGlacierBlock:              nil,
 		MergeNetsplitBlock:            nil,
@@ -305,6 +311,7 @@ type ChainConfig struct {
 	LondonBlock         *big.Int `json:"londonBlock,omitempty"`         // London switch block (nil = no fork, 0 = already on london)
 	ArrowGlacierBlock   *big.Int `json:"arrowGlacierBlock,omitempty"`   // Eip-4345 (bomb delay) switch block (nil = no fork, 0 = already activated)
 	GrayGlacierBlock    *big.Int `json:"grayGlacierBlock,omitempty"`    // Eip-5133 (bomb delay) switch block (nil = no fork, 0 = already activated)
+	CaerusBlock         *big.Int `json:"caerusBlock,omitempty"`         // CAERUS
 	MergeNetsplitBlock  *big.Int `json:"mergeNetsplitBlock,omitempty"`  // Virtual fork after The Merge to use as a network splitter
 
 	// Fork scheduling was switched from blocks to timestamps here
@@ -417,6 +424,7 @@ func (c *ChainConfig) Description() string {
 	}
 	banner += fmt.Sprintf(" - Berlin:                      #%-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/berlin.md)\n", c.BerlinBlock)
 	banner += fmt.Sprintf(" - London:                      #%-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/london.md)\n", c.LondonBlock)
+	banner += fmt.Sprintf(" - Caerus:                      #%-8v (TBD)\n", c.CaerusBlock) // TODO @lukepark327
 	if c.ArrowGlacierBlock != nil {
 		banner += fmt.Sprintf(" - Arrow Glacier:               #%-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/arrow-glacier.md)\n", c.ArrowGlacierBlock)
 	}
@@ -580,6 +588,11 @@ func (c *ChainConfig) IsOptimismPreBedrock(num *big.Int) bool {
 	return c.IsOptimism() && !c.IsBedrock(num)
 }
 
+// IsOptimismPreBedrock returns true iff this is an optimism node & bedrock is not yet active
+func (c *ChainConfig) IsCaerus(num *big.Int) bool {
+	return isBlockForked(c.CaerusBlock, num)
+}
+
 // CheckCompatible checks whether scheduled fork transitions have been imported
 // with a mismatching chain configuration.
 func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64, time uint64) *ConfigCompatError {
@@ -630,6 +643,7 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "londonBlock", block: c.LondonBlock},
 		{name: "arrowGlacierBlock", block: c.ArrowGlacierBlock, optional: true},
 		{name: "grayGlacierBlock", block: c.GrayGlacierBlock, optional: true},
+		{name: "caerusBlock", block: c.CaerusBlock},
 		{name: "mergeNetsplitBlock", block: c.MergeNetsplitBlock, optional: true},
 		{name: "shanghaiTime", timestamp: c.ShanghaiTime},
 		{name: "cancunTime", timestamp: c.CancunTime, optional: true},
@@ -725,6 +739,9 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 	if isForkBlockIncompatible(c.GrayGlacierBlock, newcfg.GrayGlacierBlock, headNumber) {
 		return newBlockCompatError("Gray Glacier fork block", c.GrayGlacierBlock, newcfg.GrayGlacierBlock)
 	}
+	if isForkBlockIncompatible(c.CaerusBlock, newcfg.CaerusBlock, headNumber) {
+		return newBlockCompatError("Caerus fork block", c.CaerusBlock, newcfg.CaerusBlock)
+	}
 	if isForkBlockIncompatible(c.MergeNetsplitBlock, newcfg.MergeNetsplitBlock, headNumber) {
 		return newBlockCompatError("Merge netsplit fork block", c.MergeNetsplitBlock, newcfg.MergeNetsplitBlock)
 	}
@@ -737,6 +754,7 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 	if isForkTimestampIncompatible(c.PragueTime, newcfg.PragueTime, headTimestamp) {
 		return newTimestampCompatError("Prague fork timestamp", c.PragueTime, newcfg.PragueTime)
 	}
+
 	return nil
 }
 
@@ -889,6 +907,7 @@ type Rules struct {
 	IsBerlin, IsLondon                                      bool
 	IsMerge, IsShanghai, IsCancun, IsPrague                 bool
 	IsOptimismBedrock, IsOptimismRegolith                   bool
+	IsCaerus                                                bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -916,5 +935,7 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		// Optimism
 		IsOptimismBedrock:  c.IsOptimismBedrock(num),
 		IsOptimismRegolith: c.IsOptimismRegolith(timestamp),
+		// CAERUS
+		IsCaerus: c.IsCaerus(num),
 	}
 }

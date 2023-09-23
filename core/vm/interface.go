@@ -20,12 +20,16 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/state/snapshot"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
 )
 
 // StateDB is an EVM database for full state querying.
 type StateDB interface {
+	GetDatabaseAndSnaps() (state.Database, *snapshot.Tree)
+
 	CreateAccount(common.Address)
 
 	SubBalance(common.Address, *big.Int)

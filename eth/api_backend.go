@@ -239,6 +239,10 @@ func (b *EthAPIBackend) StateAndHeaderByNumberOrHash(ctx context.Context, blockN
 	return nil, nil, errors.New("invalid arguments; neither block nor hash specified")
 }
 
+func (b *EthAPIBackend) StateAt(ctx context.Context, root common.Hash) (*state.StateDB, error) {
+	return b.eth.BlockChain().StateAt(root)
+}
+
 func (b *EthAPIBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
 	return b.eth.blockchain.GetReceiptsByHash(hash), nil
 }

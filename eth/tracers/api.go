@@ -87,6 +87,7 @@ type Backend interface {
 	ChainDb() ethdb.Database
 	StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, StateReleaseFunc, error)
 	StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, StateReleaseFunc, error)
+	StateAt(ctx context.Context, root common.Hash) (*state.StateDB, error)
 	HistoricalRPCService() *rpc.Client
 }
 
@@ -1035,6 +1036,10 @@ func overrideConfig(original *params.ChainConfig, override *params.ChainConfig) 
 	canon := true
 
 	// Apply forks (after Berlin) to the copy.
+	if block := override.CaerusBlock; block != nil {
+		copy.CaerusBlock = block
+		canon = false
+	}
 	if block := override.BerlinBlock; block != nil {
 		copy.BerlinBlock = block
 		canon = false

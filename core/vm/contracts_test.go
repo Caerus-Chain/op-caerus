@@ -20,11 +20,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // precompiledTest defines the input/output pairs for precompiled contract tests.
@@ -65,6 +70,7 @@ var allPrecompiles = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{16}):   &bls12381Pairing{},
 	common.BytesToAddress([]byte{17}):   &bls12381MapG1{},
 	common.BytesToAddress([]byte{18}):   &bls12381MapG2{},
+	common.BytesToAddress([]byte{19}):   &caerus{},
 }
 
 // EIP-152 test vectors
@@ -92,11 +98,35 @@ var blake2FMalformedInputTests = []precompiledFailureTest{
 }
 
 func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
+	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+
+	vmctx := BlockContext{
+		CanTransfer: func(StateDB, common.Address, *big.Int) bool { return true },
+		Transfer:    func(StateDB, common.Address, common.Address, *big.Int) {},
+		BlockNumber: big.NewInt(36548000),
+		GetStateAt: func(u uint64) *state.StateDB {
+			address := common.HexToAddress("c53B1C26C992CAF4662A1B98954E641f323d8a55")
+			key := common.HexToHash("0")
+			value := common.HexToHash("2")
+			statedb.SetState(address, key, value)
+
+			return statedb
+		},
+	}
+	evm := NewEVM(vmctx, TxContext{}, statedb, params.AllEthashProtocolChanges, Config{ExtraEips: []int{2200}})
+
+	// address := common.HexToAddress("c53B1C26C992CAF4662A1B98954E641f323d8a55")
+	// key := common.HexToHash("0")
+	// state := evm.Context.GetStateAt(big.NewInt(36548000).Uint64())
+	// res := state.GetState(address, key)
+	// fmt.Println(address, key, value)
+
 	p := allPrecompiles[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.Input)
-	gas := p.RequiredGas(in)
+	gas := p.RequiredGas(in, evm)
+
 	t.Run(fmt.Sprintf("%s-Gas=%d", test.Name, gas), func(t *testing.T) {
-		if res, _, err := RunPrecompiledContract(p, in, gas); err != nil {
+		if res, _, err := RunPrecompiledContract(p, in, gas, evm); err != nil {
 			t.Error(err)
 		} else if common.Bytes2Hex(res) != test.Expected {
 			t.Errorf("Expected %v, got %v", test.Expected, common.Bytes2Hex(res))
@@ -113,12 +143,19 @@ func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
 }
 
 func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
+	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	vmctx := BlockContext{
+		CanTransfer: func(StateDB, common.Address, *big.Int) bool { return true },
+		Transfer:    func(StateDB, common.Address, common.Address, *big.Int) {},
+		BlockNumber: big.NewInt(36548000)}
+	evm := NewEVM(vmctx, TxContext{}, statedb, params.AllEthashProtocolChanges, Config{ExtraEips: []int{2200}})
+
 	p := allPrecompiles[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.Input)
-	gas := p.RequiredGas(in) - 1
+	gas := p.RequiredGas(in, evm) - 1
 
 	t.Run(fmt.Sprintf("%s-Gas=%d", test.Name, gas), func(t *testing.T) {
-		_, _, err := RunPrecompiledContract(p, in, gas)
+		_, _, err := RunPrecompiledContract(p, in, gas, evm)
 		if err.Error() != "out of gas" {
 			t.Errorf("Expected error [out of gas], got [%v]", err)
 		}
@@ -131,11 +168,19 @@ func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
 }
 
 func testPrecompiledFailure(addr string, test precompiledFailureTest, t *testing.T) {
+	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	vmctx := BlockContext{
+		CanTransfer: func(StateDB, common.Address, *big.Int) bool { return true },
+		Transfer:    func(StateDB, common.Address, common.Address, *big.Int) {},
+		BlockNumber: big.NewInt(36548000)}
+	evm := NewEVM(vmctx, TxContext{}, statedb, params.AllEthashProtocolChanges, Config{ExtraEips: []int{2200}})
+
 	p := allPrecompiles[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.Input)
-	gas := p.RequiredGas(in)
+	gas := p.RequiredGas(in, evm)
+
 	t.Run(test.Name, func(t *testing.T) {
-		_, _, err := RunPrecompiledContract(p, in, gas)
+		_, _, err := RunPrecompiledContract(p, in, gas, evm)
 		if err.Error() != test.ExpectedError {
 			t.Errorf("Expected error [%v], got [%v]", test.ExpectedError, err)
 		}
@@ -151,9 +196,18 @@ func benchmarkPrecompiled(addr string, test precompiledTest, bench *testing.B) {
 	if test.NoBenchmark {
 		return
 	}
+
+	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	vmctx := BlockContext{
+		CanTransfer: func(StateDB, common.Address, *big.Int) bool { return true },
+		Transfer:    func(StateDB, common.Address, common.Address, *big.Int) {},
+		BlockNumber: big.NewInt(36548000),
+	}
+	evm := NewEVM(vmctx, TxContext{}, statedb, params.AllEthashProtocolChanges, Config{ExtraEips: []int{2200}})
+
 	p := allPrecompiles[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.Input)
-	reqGas := p.RequiredGas(in)
+	reqGas := p.RequiredGas(in, evm)
 
 	var (
 		res  []byte
@@ -167,7 +221,7 @@ func benchmarkPrecompiled(addr string, test precompiledTest, bench *testing.B) {
 		bench.ResetTimer()
 		for i := 0; i < bench.N; i++ {
 			copy(data, in)
-			res, _, err = RunPrecompiledContract(p, data, reqGas)
+			res, _, err = RunPrecompiledContract(p, data, reqGas, evm)
 		}
 		bench.StopTimer()
 		elapsed := uint64(time.Since(start))
@@ -271,6 +325,8 @@ func TestPrecompileBlake2FMalformedInput(t *testing.T) {
 }
 
 func TestPrecompiledEcrecover(t *testing.T) { testJson("ecRecover", "01", t) }
+
+func TestPrecompiledCaerus(t *testing.T) { testJson("caerus", "13", t) }
 
 func testJson(name, addr string, t *testing.T) {
 	tests, err := loadJson(name)

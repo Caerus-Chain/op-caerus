@@ -17,10 +17,12 @@
 package core
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/params"
@@ -34,6 +36,8 @@ type ChainContext interface {
 
 	// GetHeader returns the header corresponding to the hash/number argument pair.
 	GetHeader(common.Hash, uint64) *types.Header
+
+	StateAt(common.Hash) (*state.StateDB, error)
 }
 
 // NewEVMBlockContext creates a new context for use in the EVM.
@@ -60,6 +64,7 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 		CanTransfer: CanTransfer,
 		Transfer:    Transfer,
 		GetHash:     GetHashFn(header, chain),
+		GetStateAt:  GetStateAtFn(header, chain),
 		Coinbase:    beneficiary,
 		BlockNumber: new(big.Int).Set(header.Number),
 		Time:        header.Time,
@@ -128,4 +133,26 @@ func CanTransfer(db vm.StateDB, addr common.Address, amount *big.Int) bool {
 func Transfer(db vm.StateDB, sender, recipient common.Address, amount *big.Int) {
 	db.SubBalance(sender, amount)
 	db.AddBalance(recipient, amount)
+}
+
+func GetStateAtFn(ref *types.Header, chain ChainContext) func(n uint64) *state.StateDB {
+	hashFn := GetHashFn(ref, chain)
+
+	return func(n uint64) *state.StateDB {
+		if ref.Number.Uint64() <= n {
+			return &state.StateDB{}
+		}
+
+		h := chain.GetHeader(hashFn(n), n)
+
+		s, err := chain.StateAt(h.Root)
+
+		if err != nil {
+			return &state.StateDB{}
+		}
+
+		fmt.Println(s)
+		fmt.Println("********************************************************")
+		return s
+	}
 }
